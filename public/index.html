@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jogo Online</title>
+  <style>
+    canvas { border: 1px solid black; display: block; margin: 20px auto; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" width="500" height="500"></canvas>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const players = {};
+
+    // Desenhar todos os jogadores
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let id in players) {
+        const { x, y } = players[id];
+        ctx.fillStyle = "blue";
+        ctx.fillRect(x, y, 20, 20); // Desenhar quadrado
+      }
+    }
+
+    // Atualizar estado inicial
+    socket.on("estadoInicial", (estado) => {
+      Object.assign(players, estado);
+      render();
+    });
+
+    // Adicionar novo jogador
+    socket.on("novoJogador", (jogador) => {
+      players[jogador.id] = { x: jogador.x, y: jogador.y };
+      render();
+    });
+
+    // Atualizar posição de um jogador
+    socket.on("atualizarJogador", (jogador) => {
+      if (players[jogador.id]) {
+        players[jogador.id] = { x: jogador.x, y: jogador.y };
+        render();
+      }
+    });
+
+    // Remover jogador desconectado
+    socket.on("removerJogador", (id) => {
+      delete players[id];
+      render();
+    });
+
+    // Detectar teclas e enviar movimento
+    document.addEventListener("keydown", (e) => {
+      let dx = 0, dy = 0;
+      if (e.key === "ArrowUp") dy = -5;
+      if (e.key === "ArrowDown") dy = 5;
+      if (e.key === "ArrowLeft") dx = -5;
+      if (e.key === "ArrowRight") dx = 5;
+
+      if (dx !== 0 || dy !== 0) {
+        socket.emit("movimento", { dx, dy });
+      }
+    });
+  </script>
+</body>
+</html>
