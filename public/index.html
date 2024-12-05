@@ -6,52 +6,97 @@
   <title>Jogo Online</title>
   <style>
     canvas { border: 1px solid black; display: block; margin: 20px auto; }
+    #ranking { text-align: center; margin-top: 20px; }
+    #ranking ul { list-style: none; padding: 0; }
   </style>
 </head>
 <body>
   <canvas id="canvas" width="500" height="500"></canvas>
+  <div id="ranking">
+    <h3>Ranking</h3>
+    <ul id="ranking-list"></ul>
+  </div>
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
+    const rankingList = document.getElementById("ranking-list");
 
     const players = {};
+    let quadradoPontos = {};
 
-    // Desenhar todos os jogadores
+    // Solicitar nome do jogador
+    const nome = prompt("Digite seu nome:");
+    socket.emit("atualizarNome", nome);
+
+    // Desenhar todos os jogadores e o quadrado de pontos
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Desenhar quadrado de pontos
+      ctx.fillStyle = "black";
+      ctx.fillRect(quadradoPontos.x, quadradoPontos.y, quadradoPontos.tamanho, quadradoPontos.tamanho);
+
+      // Desenhar jogadores
       for (let id in players) {
         const { x, y } = players[id];
         ctx.fillStyle = "blue";
-        ctx.fillRect(x, y, 20, 20); // Desenhar quadrado
+        ctx.fillRect(x, y, 20, 20);
       }
+    }
+
+    // Atualizar ranking
+    function atualizarRanking() {
+      rankingList.innerHTML = "";
+      const sortedPlayers = Object.values(players).sort((a, b) => b.pontos - a.pontos);
+      sortedPlayers.forEach((player) => {
+        const li = document.createElement("li");
+        li.textContent = `${player.nome}: ${player.pontos} pontos`;
+        rankingList.appendChild(li);
+      });
     }
 
     // Atualizar estado inicial
     socket.on("estadoInicial", (estado) => {
-      Object.assign(players, estado);
+      Object.assign(players, estado.players);
+      quadradoPontos = estado.quadradoPontos;
       render();
+      atualizarRanking();
     });
 
     // Adicionar novo jogador
     socket.on("novoJogador", (jogador) => {
-      players[jogador.id] = { x: jogador.x, y: jogador.y };
+      players[jogador.id] = { x: jogador.x, y: jogador.y, pontos: jogador.pontos, nome: jogador.nome };
       render();
+      atualizarRanking();
     });
 
     // Atualizar posição de um jogador
     socket.on("atualizarJogador", (jogador) => {
       if (players[jogador.id]) {
-        players[jogador.id] = { x: jogador.x, y: jogador.y };
+        players[jogador.id] = jogador;
         render();
       }
+    });
+
+    // Atualizar ranking
+    socket.on("atualizarRanking", (novoRanking) => {
+      Object.assign(players, novoRanking);
+      atualizarRanking();
+    });
+
+    // Atualizar quadrado de pontos
+    socket.on("novoQuadrado", (novoQuadrado) => {
+      quadradoPontos = novoQuadrado;
+      render();
     });
 
     // Remover jogador desconectado
     socket.on("removerJogador", (id) => {
       delete players[id];
       render();
+      atualizarRanking();
     });
 
     // Detectar teclas e enviar movimento
@@ -69,3 +114,4 @@
   </script>
 </body>
 </html>
+
